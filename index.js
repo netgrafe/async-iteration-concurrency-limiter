@@ -1,25 +1,25 @@
 function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, opts) {
     return new Promise((resolve, reject) => {
         const queue = [];
-        const numberOfActivePromises = 0;
-        const donePromises = 0;
         const results = [];
+        let numberOfActivePromises = 0;
+        let donePromises = 0;
 
         function pickNext() {
             if (queue.length > 0) {
-                const next = queue.shift();
+                const { value, index } = queue.shift();
 
-                next();
+                process(value, index);
             } else if (numberOfActivePromises === 0) {
                 resolve(results);
             }
         }
 
-        async function process(value, asyncFn, index) {
+        async function process(value, index) {
             numberOfActivePromises++;
 
             asyncFn(value).then((result) => {
-                if (opts.failFast) {
+                if (opts && opts.failFast) {
                     results[index] = result;
                 } else {
                     results[index] = {
@@ -28,7 +28,7 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
                     };
                 }
             }).catch((error) => {
-                if (opts.failFast) {
+                if (opts && opts.failFast) {
                     reject(error);
                 } else {
                     results[index] = {
@@ -40,7 +40,7 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
                 donePromises++;
                 numberOfActivePromises--;
 
-                if (opts.onProgress) {
+                if (opts && opts.onProgress) {
                     onProgress({
                         percentage: Number(((donePromises / listOfValues.length) / 100).toFixed()),
                         done: donePromises,
@@ -52,11 +52,11 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
             });
         }
 
-        function putToQueue(value, asyncFn, index) {
-            if (numberOfActivePromises <= concurrency) {
-                process(value, asyncFn, index);
+        function putToQueue(value, index) {
+            if (numberOfActivePromises < concurrency) {
+                process(value, index);
             } else {
-                queue.push(process.bind(null, value, asyncFn, index));
+                queue.push({ value, index });
             }
         }
 

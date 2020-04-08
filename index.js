@@ -41,8 +41,8 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
                 numberOfActivePromises--;
 
                 if (opts && opts.onProgress) {
-                    onProgress({
-                        percentage: Number(((donePromises / listOfValues.length) / 100).toFixed()),
+                    opts.onProgress({
+                        percentage: Number(((donePromises / listOfValues.length) * 100).toFixed()),
                         done: donePromises,
                         total: listOfValues.length
                     });
@@ -60,7 +60,7 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
             }
         }
 
-        listOfValues.forEach((value, index) => putToQueue(value, asyncFn, index));
+        listOfValues.forEach((value, index) => putToQueue(value, index));
     });
 }
 

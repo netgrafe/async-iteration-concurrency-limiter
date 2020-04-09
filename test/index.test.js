@@ -12,66 +12,78 @@ describe('Test concurrency limiter', () => {
     const listOfValues = [ 'a', 'b', 'c'];
     let resolveValues;
     let promises;
-    let promiseWrappers;
     let asynFnStub;
 
     beforeEach(() => {
-        promiseWrappers = [];
-        promises = listOfValues.map((v, index) => {
-            promiseWrappers[index] = {};
-
-            return new Promise((resolve, reject) => {
-                promiseWrappers[index].resolve = resolve;
-                promiseWrappers[index].reject = reject;
-            })
-        });
+        // promiseWrappers = [];
         resolveValues = listOfValues.map((value) => `result-of-${value}`);
 
         asynFnStub = sinon.stub();
+        promises = {};
 
         asynFnStub.callsFake((input) => {
-            const index = listOfValues.indexOf(input);
-            return promises[index];
+            const thenCallbacks = [];
+            const catchCallbacks = [];
+
+            const fakePromise = {
+                then(callback) {
+                    thenCallbacks.push(callback);
+                    return this;
+                },
+                catch(callback) {
+                    catchCallbacks.push(callback);
+                    return this;
+                },
+                resolve() {
+                    thenCallbacks[0](input);
+                    thenCallbacks[1]();
+                },
+                reject() {
+                    catchCallbacks[0](`error-${input}`);
+                    thenCallbacks[1]();
+                }
+            };
+
+            promises[input] = fakePromise;
+
+            return fakePromise;
         })
     });
 
-    describe('WHEN function called with default options', (done) => {
-        it('should call the function at max number of concurrency, until there is no resolving', () => {
+    describe('WHEN function called with default options', () => {
+        it('should call the function at max number of concurrency, until there is no resolving', async () => {
             // WHEN
-            let endResult;
-
             const result = SUT(listOfValues, asynFnStub, 2);
-
-            result.then(res => {
-                expect(endResult).to.have.ordered.members(
-                    listOfValues.map((val, index) => ({ status: 'fulfilled', value: resolveValues[index] }))
-                );
-                done();
-            });
 
             // THEN
             expect(asynFnStub).to.have.been.calledWith(listOfValues[0]);
             expect(asynFnStub).to.have.been.calledWith(listOfValues[1]);
             expect(asynFnStub.callCount).to.equal(2);
-            expect(endResult).to.be.undefined;
 
             // WHEN
-            promiseWrappers[1].resolve(resolveValues[1]);
+            promises[listOfValues[0]].resolve();
 
             // THEN
             expect(asynFnStub).to.have.been.calledWith(listOfValues[2]);
             expect(asynFnStub.callCount).to.equal(3);
-            expect(endResult).to.be.undefined;
 
             // WHEN
-            promiseWrappers[0].resolve(resolveValues[0]);
+            promises[listOfValues[2]].resolve();
+
+            // THEN
             expect(asynFnStub.callCount).to.equal(3);
-            expect(endResult).to.be.undefined;
 
             // WHEN
-            promiseWrappers[2].resolve(resolveValues[2]);
+            promises[listOfValues[1]].resolve();
 
+            // THEN
+            const endResult = await result;
 
+            expect(endResult.length).to.equal(3);
+            expect(endResult).to.have.same.deep.members(listOfValues.map(v => ({
+                status: 'fulfilled',
+                value: v
+            })));
         });
     });
 });

@@ -4,6 +4,7 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
         const results = [];
         let numberOfActivePromises = 0;
         let donePromises = 0;
+        let fastFailHappened = false;
 
         function pickNext() {
             if (queue.length > 0) {
@@ -29,6 +30,7 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
                 }
             }).catch((error) => {
                 if (opts && opts.failFast) {
+                    fastFailHappened = true;
                     reject(error);
                 } else {
                     results[index] = {
@@ -48,7 +50,9 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
                     });
                 }
 
-                pickNext();
+                if (!fastFailHappened) {
+                    pickNext();
+                }
             });
         }
 

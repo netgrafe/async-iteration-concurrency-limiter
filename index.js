@@ -35,22 +35,23 @@ function asnycIterationConcurrencyLimiter(listOfValues, asyncFn, concurrency, op
                 } else {
                     results[index] = {
                         status: 'rejected',
-                        reasons: error
+                        reason: error
                     }
                 }
             }).then(() => {
                 donePromises++;
                 numberOfActivePromises--;
 
-                if (opts && opts.onProgress) {
-                    opts.onProgress({
-                        percentage: Number(((donePromises / listOfValues.length) * 100).toFixed()),
-                        done: donePromises,
-                        total: listOfValues.length
-                    });
-                }
-
                 if (!fastFailHappened) {
+                    if (opts && opts.onProgress) {
+                        opts.onProgress({
+                            percentage: Number(((donePromises / listOfValues.length) * 100).toFixed(2)),
+                            done: donePromises,
+                            total: listOfValues.length,
+                            finishedItem: value
+                        });
+                    }
+
                     pickNext();
                 }
             });
